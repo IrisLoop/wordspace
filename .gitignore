@@ -1,0 +1,7 @@
+node_modules/
+.npm-cache/
+data/
+runtime/
+ecdict.csv
+test-results/
+.deploy/

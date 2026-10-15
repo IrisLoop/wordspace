@@ -1,0 +1,106 @@
+{
+  "us:across": {
+    "file": "us-across.ogg",
+    "source": "https://commons.wikimedia.org/w/index.php?curid=718855",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseName": "BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/1/12/En-us-across.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:activity": {
+    "file": "us-activity.ogg",
+    "source": "https://commons.wikimedia.org/w/index.php?curid=1749696",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseName": "BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/d/d5/En-us-activity.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:apple": {
+    "file": "us-apple.ogg",
+    "source": "https://commons.wikimedia.org/w/index.php?curid=718877",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseName": "BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/9/9a/En-us-apple.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:provide": {
+    "file": "us-provide.ogg",
+    "source": "https://commons.wikimedia.org/w/index.php?curid=1239797",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseName": "BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/d/d7/En-us-provide.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:part": {
+    "file": "us-part.ogg",
+    "source": "https://commons.wikimedia.org/w/index.php?curid=711194",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseName": "BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/3/33/En-us-part.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:back": {
+    "file": "us-back.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-back.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/e/ec/En-us-back.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:but": {
+    "file": "us-but.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-but.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/7/7d/En-us-but.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:book": {
+    "file": "us-book.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-book.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-book.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:day": {
+    "file": "us-day.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-day.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "No machine-readable author provided. Dvortygirl assumed (based on copyright claims).",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/5/58/En-us-day.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:her": {
+    "file": "us-her.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-her.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/2/2c/En-us-her.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:man": {
+    "file": "us-man.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-man.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/4/45/En-us-man.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:take": {
+    "file": "us-take.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-take.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/9/9b/En-us-take.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  },
+  "us:small": {
+    "file": "us-small.ogg",
+    "source": "https://commons.wikimedia.org/wiki/File:En-us-small.ogg",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "licenseName": "CC BY-SA 3.0",
+    "author": "Dvortygirl",
+    "audio": "https://upload.wikimedia.org/wikipedia/commons/b/b5/En-us-small.ogg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original"
+  }
+}

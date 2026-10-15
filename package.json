@@ -1,0 +1,22 @@
+{
+  "name": "wordspace-local",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "词间：本地英语词库与听写工作台",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "build:pages": "node scripts/build-pages.mjs"
+  },
+  "dependencies": {
+    "csv-parse": "^6.1.0",
+    "mammoth": "^1.11.0",
+    "pdfjs-dist": "^5.4.149",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "ecdict": "^0.0.4"
+  }
+}
