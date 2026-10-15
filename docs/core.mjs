@@ -1,4 +1,4 @@
-export const defaults = { interval: 8, repeats: 2, rate: 1, voice: '', shuffle: false, answerMode: 'handwriting', audioSource: 'recording', accent: 'us' };
+export const defaults = { interval: 8, repeats: 2, rate: 1, voice: '', shuffle: false, answerMode: 'handwriting', audioSource: 'youdao', accent: 'us' };
 export const emptyState = () => ({ version: 1, revision: 0, nextLibrary: 1, libraries: [], mistakes: {}, history: [], settings: { ...defaults } });
 export const normalize = word => word.trim().toLowerCase().replace(/[’‘]/g, "'");
 export const answerCorrect = (answer, word) => normalize(answer) === normalize(word);
@@ -49,7 +49,8 @@ export function validateState(data) {
   if (!Number.isInteger(data.nextLibrary) || data.nextLibrary < 1 || !Number.isInteger(data.revision) || data.revision < 0) fail();
   const s = data.settings;
   if (!Number.isInteger(s.interval) || s.interval < 2 || s.interval > 30 || !Number.isInteger(s.repeats) || s.repeats < 1 || s.repeats > 3 || typeof s.rate !== 'number' || s.rate < 0.5 || s.rate > 1.3 || typeof s.voice !== 'string' || typeof s.shuffle !== 'boolean') fail();
-  for(const [key,allowed] of Object.entries({answerMode:['handwriting','typing'],audioSource:['recording','system'],accent:['us','uk']})) if(s[key] !== undefined && !allowed.includes(s[key])) fail();
+  for(const [key,allowed] of Object.entries({answerMode:['handwriting','typing'],audioSource:['youdao','recording','system'],accent:['us','uk']})) if(s[key] !== undefined && !allowed.includes(s[key])) fail();
+  if(s.audioSource==='recording')s.audioSource='youdao';
   data.settings={...defaults,...s};
   return data;
 }

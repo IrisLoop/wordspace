@@ -1,100 +1,91 @@
 const abortError=()=>new DOMException('Playback cancelled','AbortError');
-const recordings=new Map();
 export const pronunciationSources=new Map();
-let bundledIndex;
-async function bundledRecording(word,accent){
-  bundledIndex??=fetch(new URL('./assets/audio/index.json',import.meta.url)).then(r=>r.ok?r.json():{}).catch(()=>({}));
-  const item=(await bundledIndex)[`${accent}:${word}`];if(!item)throw new Error('无内置录音');
-  const response=await fetch(new URL(`./assets/audio/${item.file}`,import.meta.url));if(!response.ok)throw new Error('内置录音加载失败');
-  return {...item,bytes:await response.arrayBuffer()};
-}
-export function centeredPCM(channels, sampleRate, before=.18, after=.25) {
-  const length=channels[0].length, offset=Math.round(before*sampleRate);
-  const mono=new Float32Array(offset+length+Math.round(after*sampleRate));
-  let peak=0;
-  for(let i=0;i<length;i++) {let sum=0;for(const channel of channels)sum+=channel[i]||0;const value=sum/channels.length;mono[offset+i]=value;peak=Math.max(peak,Math.abs(value));}
-  const gain=peak>0?Math.min(1.6,.9/peak):1;
-  for(let i=offset;i<offset+length;i++)mono[i]*=gain;
-  return [mono,new Float32Array(mono)];
-}
-function safeURL(value){try{const url=new URL(value);return url.protocol==='https:'?url.href:null;}catch{return null;}}
-async function originalRecording(item) {
-  const source=new URL(item.sourceUrl);
-  if(source.hostname!=='commons.wikimedia.org')throw new Error('没有原始录音地址');
-  const query=new URLSearchParams({action:'query',prop:'imageinfo',iiprop:'url|extmetadata',format:'json',origin:'*'});
-  if(source.searchParams.get('curid'))query.set('pageids',source.searchParams.get('curid'));
-  else if(source.pathname.startsWith('/wiki/File:'))query.set('titles',decodeURIComponent(source.pathname.slice(6)));
-  else throw new Error('无法解析原始录音地址');
-  const response=await fetch(`https://commons.wikimedia.org/w/api.php?${query}`,{signal:AbortSignal.timeout(5000)});
-  if(!response.ok)throw new Error('原始录音查询失败');
-  const data=await response.json(),info=Object.values(data.query?.pages||{})[0]?.imageinfo?.[0];
-  if(!safeURL(info?.url)||new URL(info.url).hostname!=='upload.wikimedia.org')throw new Error('原始录音不可用');
-  const audio=await fetch(info.url,{signal:AbortSignal.timeout(6000)});
-  if(!audio.ok)throw new Error('原始录音下载失败');
-  return {bytes:await audio.arrayBuffer(),author:info.extmetadata?.Artist?.value?.replace(/<[^>]*>/g,'').slice(0,200)||'',audio:info.url};
-}
-async function getRecording(word,accent) {
-  const key=`${accent}:${word}`;
-  if(!recordings.has(key)) recordings.set(key,(async()=>{
-    try{const bundled=await bundledRecording(word,accent);pronunciationSources.set(word,bundled);return bundled;}catch{}
-    const response=await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,{signal:AbortSignal.timeout(6500)});
-    if(!response.ok)throw new Error('无真人录音');
-    const entries=await response.json();
-    const candidates=entries.flatMap(e=>e.phonetics||[]).filter(p=>safeURL(p.audio)&&p.sourceUrl&&p.license?.url);
-    candidates.sort((a,b)=>Number(b.audio.includes(`-${accent}.`))-Number(a.audio.includes(`-${accent}.`)));
-    const item=candidates[0];if(!item)throw new Error('无可用的授权录音');
-    let media;
-    try{media=await originalRecording(item);}catch{
-      const audio=await fetch(item.audio,{signal:AbortSignal.timeout(5000)});if(!audio.ok)throw new Error('录音加载失败');
-      media={bytes:await audio.arrayBuffer(),audio:item.audio,author:''};
-    }
-    const result={...media,source:safeURL(item.sourceUrl),license:safeURL(item.license.url),licenseName:item.license.name||'来源许可'};
-    pronunciationSources.set(word,result);return result;
-  })().catch(e=>{recordings.delete(key);throw e;}));
-  return recordings.get(key);
+export const LOAD_TIMEOUT_MS=4000;
+export function dictionaryAudioURL(word,accent='us'){
+  const normalized=word.trim().toLowerCase().replace(/[’‘]/g,"'");
+  if(!/^[a-z]+(?:['-][a-z]+)*$/.test(normalized)||normalized.length>48)throw new Error('请检查英文单词拼写。');
+  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(normalized)}&type=${accent==='uk'?1:2}`;
 }
 export class PronunciationService {
-  constructor(engine=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance){this.engine=engine;this.Utterance=Utterance;this.generation=0;}
-  async unlock(){const Context=globalThis.AudioContext||globalThis.webkitAudioContext;if(Context){this.context??=new Context();if(this.context.state==='suspended')await this.context.resume();}}
-  prefetch(word,settings){if(settings.audioSource!=='system')getRecording(word,settings.accent||'us').catch(()=>{});}
-  cancel(){this.generation++;clearTimeout(this.timer);this.stop?.();this.stop=null;}
-  async play(word,settings,onStart=()=>{},onSource=()=>{}) {
-    this.cancel();const generation=this.generation;
-    if(settings.audioSource!=='system') {
-      onSource('正在加载真人录音…');
-      try {
-        const recording=await getRecording(word,settings.accent||'us');
-        if(generation!==this.generation)throw abortError();
-        await this.unlock();if(!this.context)throw new Error('浏览器不支持音频处理');
-        const decoded=await this.context.decodeAudioData(recording.bytes.slice(0));
-        if(generation!==this.generation)throw abortError();
-        const channels=centeredPCM(Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i)),decoded.sampleRate);
-        const buffer=this.context.createBuffer(2,channels[0].length,decoded.sampleRate);channels.forEach((channel,i)=>buffer.copyToChannel(channel,i));
-        const source=this.context.createBufferSource();source.buffer=buffer;source.playbackRate.value=Math.max(.75,Math.min(1.2,settings.rate));source.connect(this.context.destination);
-        onSource('真人词典录音 · 居中双声道');
-        await new Promise((resolve,reject)=>{this.stop=()=>{source.onended=null;source.stop();source.disconnect();reject(abortError());};source.onended=()=>{this.stop=null;source.disconnect();resolve();};source.start();onStart();});
-        return;
-      } catch(e) {if(generation!==this.generation||e.name==='AbortError')throw abortError();console.warn('真人录音暂不可用：',e.name,e.message);}
+  constructor(engine=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,{createAudio=url=>new Audio(url),loadTimeoutMs=LOAD_TIMEOUT_MS}={}){
+    Object.assign(this,{engine,Utterance,createAudio,loadTimeoutMs});this.generation=0;this.cache=new Map();
+  }
+  async unlock(){}
+  entry(word,settings){
+    const url=dictionaryAudioURL(word,settings.accent);
+    let entry=this.cache.get(url);
+    if(entry?.failed){this.cache.delete(url);entry=null;}
+    if(!entry){
+      const audio=this.createAudio(url);audio.preload='auto';
+      // Normal cross-origin media playback preserves the publisher's audio.
+      // This endpoint does not offer CORS, so do not route it through Web Audio.
+      entry={audio,url,failed:false};
+      audio.addEventListener('error',()=>{entry.failed=true;});
+      this.cache.set(url,entry);audio.load();
+      if(this.cache.size>12){for(const [key,old] of this.cache){if(old!==entry&&old!==this.active){old.audio.pause();old.audio.removeAttribute('src');old.audio.load();this.cache.delete(key);break;}}}
     }
-    if(generation!==this.generation)throw abortError();
-    onSource(settings.audioSource==='system'?'系统英语语音':'系统英语语音 · 真人录音不可用');
-    await this.speakSystem(word,settings,onStart,generation);
+    return entry;
+  }
+  prefetch(word,settings){if(settings.audioSource!=='system'){try{this.entry(word,settings);}catch{}}}
+  cancel(){this.generation++;this.stop?.();this.stop=null;}
+  async play(word,settings,onStart=()=>{},onSource=()=>{}){
+    this.cancel();const generation=this.generation;
+    pronunciationSources.delete(word);
+    if(settings.audioSource==='system'){
+      onSource('系统英语语音 · 手动选择');
+      return this.speakSystem(word,settings,onStart,generation);
+    }
+    const entry=this.entry(word,settings),audio=entry.audio;this.active=entry;
+    audio.playbackRate=Math.max(.6,Math.min(1.2,settings.rate||1));
+    audio.preservesPitch=true;audio.webkitPreservesPitch=true;audio.mozPreservesPitch=true;
+    try{audio.currentTime=0;}catch{}
+    onSource('正在加载有道词典发音…');
+    return new Promise((resolve,reject)=>{
+      let settled=false,started=false,timer;
+      const cleanup=()=>{
+        clearTimeout(timer);audio.removeEventListener('playing',playing);audio.removeEventListener('waiting',waiting);audio.removeEventListener('ended',ended);audio.removeEventListener('error',failed);
+        if(this.active===entry)this.active=null;if(generation===this.generation)this.stop=null;
+      };
+      const finish=error=>{if(settled)return;settled=true;cleanup();if(error)reject(error);else resolve();};
+      const stopWith=error=>{audio.pause();try{audio.currentTime=0;}catch{}finish(error);};
+      const arm=ms=>{clearTimeout(timer);timer=setTimeout(()=>{
+        entry.failed=true;stopWith(new Error('有道发音加载超过 4 秒，已暂停。请检查网络后点击继续，或在偏好中手动选择系统语音。'));
+        audio.removeAttribute('src');audio.load();
+      },ms);};
+      const playing=()=>{
+        if(settled||generation!==this.generation)return;
+        clearTimeout(timer);
+        timer=setTimeout(()=>stopWith(new Error('音频播放中断，已暂停。请点击继续重试。')),Math.min(20000,((Number.isFinite(audio.duration)?audio.duration:8)/audio.playbackRate+2)*1000));
+        if(!started){started=true;pronunciationSources.set(word,{provider:'youdao',source:`https://dict.youdao.com/result?word=${encodeURIComponent(word)}&lang=en`,accent:settings.accent==='uk'?'英式':'美式'});onSource(`有道词典 · ${settings.accent==='uk'?'英式':'美式'}原音 · 保持音高`);onStart();}
+      };
+      const waiting=()=>{if(!settled)arm(this.loadTimeoutMs);};
+      const ended=()=>{if(started)finish();else stopWith(new Error('未能播放这个单词，已暂停。请点击继续重试。'));};
+      const failed=()=>{entry.failed=true;stopWith(new Error('有道词典发音暂不可用，已暂停。请检查网络后重试，或手动选择系统语音。'));};
+      this.stop=()=>stopWith(abortError());
+      audio.addEventListener('playing',playing);audio.addEventListener('waiting',waiting);audio.addEventListener('ended',ended);audio.addEventListener('error',failed);
+      arm(this.loadTimeoutMs);
+      try{audio.play()?.catch(error=>{
+        if(settled)return;
+        if(generation!==this.generation)return stopWith(abortError());
+        stopWith(new Error(error.name==='NotAllowedError'?'浏览器阻止了自动播放。请点击继续或试听发音。':'音频播放失败，已暂停。请点击继续重试。'));
+      });}catch{failed();}
+    });
   }
   speakSystem(word,settings,onStart,generation){
     if(!this.engine||!this.Utterance)return Promise.reject(new Error('没有可用的英语语音，请使用 Edge / Chrome 并安装英语语音。'));
     return new Promise((resolve,reject)=>{
-      const voices=this.engine.getVoices(),lang=settings.accent==='uk'?'en-GB':'en-US';
-      const utterance=new this.Utterance(word);
+      const voices=this.engine.getVoices(),lang=settings.accent==='uk'?'en-GB':'en-US',utterance=new this.Utterance(word);
       utterance.voice=voices.find(v=>v.voiceURI===settings.voice)||voices.find(v=>v.lang===lang&&/Natural|Neural|Online/i.test(v.name))||voices.find(v=>v.lang===lang)||voices.find(v=>v.lang.startsWith('en'));
       utterance.lang=utterance.voice?.lang||lang;utterance.rate=settings.rate;
-      let watchdog;
-      const cleanup=()=>{clearTimeout(watchdog);this.stop=null;};
-      this.stop=()=>{clearTimeout(watchdog);utterance.onend=null;utterance.onerror=null;this.engine.cancel();reject(abortError());};
-      utterance.onstart=onStart;
-      utterance.onerror=e=>{cleanup();reject(new Error(`语音播放失败（${e.error}），请更换英语语音后重试。`));};
-      utterance.onend=()=>{clearTimeout(watchdog);this.stop=()=>reject(abortError());this.timer=setTimeout(()=>{cleanup();resolve();},300);};
-      this.timer=setTimeout(()=>{if(generation!==this.generation)return reject(abortError());watchdog=setTimeout(()=>{this.engine.cancel();cleanup();reject(new Error('语音播放超时，请暂停后重试。'));},25000);this.engine.speak(utterance);},180);
+      let watchdog,settled=false;
+      const finish=error=>{if(settled)return;settled=true;clearTimeout(watchdog);utterance.onstart=null;utterance.onend=null;utterance.onerror=null;if(generation===this.generation)this.stop=null;error?reject(error):resolve();};
+      this.stop=()=>{finish(abortError());this.engine.cancel();};
+      utterance.onstart=()=>{if(generation===this.generation){clearTimeout(watchdog);watchdog=setTimeout(()=>{finish(new Error('系统语音播放中断，请重试。'));this.engine.cancel();},15000);onStart();}};
+      utterance.onerror=e=>finish(new Error(`系统语音播放失败（${e.error}），请更换英语语音后重试。`));
+      utterance.onend=()=>finish();
+      watchdog=setTimeout(()=>{finish(new Error('系统语音启动超时，请点击继续重试。'));this.engine.cancel();},this.loadTimeoutMs);
       this.utterance=utterance;
+      try{this.engine.speak(utterance);}catch(e){finish(e);}
     });
   }
 }

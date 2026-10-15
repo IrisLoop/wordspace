@@ -1,4 +1,5 @@
 import { pronunciation } from './audio.mjs';
+export const REPEAT_GAP_MS=180;
 export class DictationPlayer {
   constructor(words,settings,onUpdate,onComplete,service=pronunciation){
     Object.assign(this,{words,settings,onUpdate,onComplete,service});
@@ -9,12 +10,13 @@ export class DictationPlayer {
   start(){this.service.unlock?.().catch(()=>{});this.speak();}
   async speak(){
     this.clear();this.paused=false;this.error='';this.phase='speaking';this.emit();const token=this.token;
-    if(this.words[this.index+1])this.service.prefetch?.(this.words[this.index+1].word,this.settings);
     try {
-      await this.service.play(this.words[this.index].word,this.settings,()=>{if(token===this.token){this.heard.add(this.index);this.emit();}},label=>{if(token===this.token){this.audioLabel=label;this.emit();}});
+      const playback=this.service.play(this.words[this.index].word,this.settings,()=>{if(token===this.token){this.heard.add(this.index);this.emit();}},label=>{if(token===this.token){this.audioLabel=label;this.emit();}});
+      for(let offset=1;offset<=3;offset++)if(this.words[this.index+offset])this.service.prefetch?.(this.words[this.index+offset].word,this.settings);
+      await playback;
       if(token!==this.token)return;
       this.heard.add(this.index);this.repeat++;
-      if(this.repeat<this.settings.repeats)this.wait(700,'repeat');
+      if(this.repeat<this.settings.repeats)this.wait(REPEAT_GAP_MS,'repeat');
       else this.wait(this.settings.interval*1000,'writing');
     } catch(e){if(token!==this.token||e.name==='AbortError')return;this.clear();this.paused=true;this.error=e.message;this.emit();}
   }
