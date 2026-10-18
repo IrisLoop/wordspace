@@ -2,7 +2,7 @@ import { defaults, emptyState, allWords, mistakeWords, applyReview, validateStat
 import { readFiles, parseText, lookup } from './importer.mjs';
 import { DictationPlayer } from './speech.mjs';
 import { pronunciation, pronunciationSources } from './audio.mjs';
-import { loadState, saveState, storageMode } from './storage.mjs';
+import { loadState, saveState, storageMode } from './storage.mjs?v=2.1.1';
 const $=s=>document.querySelector(s);
 const app=$('#app'), modal=$('#modal');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,8 +12,10 @@ function hydrateIcons(){document.querySelectorAll('i[data-icon]').forEach(el=>el
 const date=(value,withTime=false)=>new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',...(withTime?{hour:'2-digit',minute:'2-digit'}:{})}).format(new Date(value));
 const uid=()=>crypto.randomUUID();
 let state=emptyState(), page='home', detailId=null, search='', pageIndex=0, busySave=false, busyImport=false, player=null, practiceMode='library', answerMode='handwriting', reviewWords=[], wrong=new Set(), draft=[], draftSources=[], importTab='files', toastTimer;
+let stateReady=false, loadingState=false;
 function toast(message,error=false){const t=$('#toast');t.textContent=message;t.className=`toast show${error?' error':''}`;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast',4500);}
 async function commit(change){
+  if(!stateReady){toast('词库尚未读取成功，请先重新连接。',true);return false;}
   if(busySave){toast('正在保存，请稍等。');return false;}
   busySave=true;$('#saved-status').innerHTML='<span class="spinner"></span> 正在保存';
   try {const next=structuredClone(state);change(next);validateState(next);next.revision=await saveState(next);state=next;$('#saved-status').innerHTML='<span class="status-dot"></span>本地已同步';return true;}
@@ -25,6 +27,7 @@ function closeModal(){if(busyImport||busySave){toast('正在处理，请稍等�
 modal.addEventListener('cancel',e=>{if(busyImport||busySave)e.preventDefault();});
 function confirmAction(title,message,callback,danger=false){openModal(title,'',`<p class="note">${esc(message)}</p>`,`<span></span><div class="actions"><button class="btn" data-action="close-modal">取消</button><button class="btn ${danger?'danger':'primary'}" id="confirm-action">确认${danger?'删除':''}</button></div>`);$('#confirm-action').onclick=async()=>{if(await callback()!==false)modal.close();};}
 function go(next,id=null){
+  if(!stateReady){toast('词库尚未读取成功，请先重新连接。',true);return;}
   if(player && player.phase!=='done'){player.pause();confirmAction('离开本次听写？','本次尚未核对的听写进度不会保存。',()=>{player.destroy();player=null;page=next;detailId=id;search='';pageIndex=0;render();});return;}
   if(page==='review'){confirmAction('放弃本次核对？','尚未保存的错词勾选不会记入错词本。',()=>{page=next;detailId=id;search='';pageIndex=0;render();});return;}
   page=next;detailId=id;search='';pageIndex=0;render();
@@ -86,6 +89,8 @@ document.addEventListener('change',e=>{if(e.target.matches('[data-review]')){con
 document.addEventListener('click',async e=>{
   const nav=e.target.closest('[data-nav]');if(nav){e.preventDefault();go(nav.dataset.nav);return;}
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;
+  if(action==='retry-storage'){await initializeState();return;}
+  if(!stateReady && !['close-modal','help'].includes(action)){toast('词库尚未读取成功，请先重新连接。',true);return;}
   try {
     if(action==='close-modal')closeModal();
     else if(action==='import')showImport();else if(action==='paste')showImport('text');
@@ -115,7 +120,21 @@ window.speechSynthesis?.addEventListener('voiceschanged',()=>{const select=$('#v
 window.addEventListener('beforeunload',e=>{if(busyImport||busySave||page==='session'||page==='review'){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pagehide',()=>{player?.destroy();pronunciation.cancel();});
 hydrateIcons();
-try{state=await loadState();render();document.querySelector('.local-card p').innerHTML=storageMode==='file'?'词库与记录自动保存到本机<br>每一次积累，都有迹可循。':'词库与记录保存在此浏览器<br>记得定期导出备份。';}catch(e){app.innerHTML=empty('help','暂时无法打开本地词库',esc(e.message),'<button class="btn" onclick="location.reload()">重新加载</button>');$('#saved-status').textContent='本地服务异常';}
+async function initializeState(){
+  if(loadingState)return;
+  loadingState=true;
+  app.innerHTML='<div class="loading-state">正在连接你的词库…</div>';
+  $('#saved-status').textContent='正在连接词库';
+  try{
+    state=await loadState();stateReady=true;render();
+    $('#saved-status').innerHTML='<span class="status-dot"></span>本地已同步';
+    document.querySelector('.local-card p').innerHTML=storageMode==='file'?'词库与记录自动保存到本机<br>每一次积累，都有迹可循。':'词库与记录保存在此浏览器<br>记得定期导出备份。';
+  }catch(e){
+    app.innerHTML=empty('help','暂时无法连接词库',esc(e.message),'<button class="btn primary" data-action="retry-storage">重新连接</button>')+'<p class="note" style="text-align:center">连接失败不代表词库被删除。请勿清除网站数据；如果重连仍失败，请退出并重新打开 Safari。</p>';
+    $('#saved-status').textContent='词库连接中断';
+  }finally{loadingState=false;}
+}
+await initializeState();
 
 function audioCredits(words=reviewWords){const seen=new Set();const list=words.flatMap(w=>{if(seen.has(w.word))return[];seen.add(w.word);const source=pronunciationSources.get(w.word);return source?[`<li>${esc(w.word)} · ${esc(source.accent)} · <a target="_blank" rel="noopener noreferrer" href="${esc(source.source)}">有道词典官方词条 ↗</a></li>`]:[];});return list.length?`<details class="audio-credits"><summary>本次词典发音来源</summary><p>音频直接来自有道词典官方站点。原速播放不改变音高，也不额外添加静音；慢速播放使用浏览器保持音高功能。网络异常时暂停，不混用系统语音。Cambridge 链接用于单独查阅。</p><ul>${list.join('')}</ul></details>`:'';}
 document.addEventListener('input',e=>{if(e.target.id==='typing-answer'&&player)player.setAnswer(e.target.value);});

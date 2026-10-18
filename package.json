@@ -1,6 +1,6 @@
 {
   "name": "wordspace-local",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "type": "module",
   "description": "词间：本地英语词库与听写工作台",
@@ -17,6 +17,7 @@
     "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
-    "ecdict": "^0.0.4"
+    "ecdict": "^0.0.4",
+    "fake-indexeddb": "^6.2.6"
   }
 }
