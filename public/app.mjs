@@ -1,5 +1,5 @@
 import { defaults, emptyState, allWords, mistakeWords, applyReview, validateState, normalize, reviewAnswers, answerCorrect } from './core.mjs';
-import { readFiles, parseText, lookup } from './importer.mjs';
+import { readFiles, parseText, lookup } from './importer.mjs?v=2.2.0';
 import { DictationPlayer } from './speech.mjs';
 import { pronunciation, pronunciationSources } from './audio.mjs';
 import { loadState, saveState, storageMode } from './storage.mjs?v=2.1.1';
@@ -13,6 +13,7 @@ const date=(value,withTime=false)=>new Intl.DateTimeFormat('zh-CN',{year:'numeri
 const uid=()=>crypto.randomUUID();
 let state=emptyState(), page='home', detailId=null, search='', pageIndex=0, busySave=false, busyImport=false, player=null, practiceMode='library', answerMode='handwriting', reviewWords=[], wrong=new Set(), draft=[], draftSources=[], importTab='files', toastTimer;
 let stateReady=false, loadingState=false;
+let draftNotes=[], draftOCR=false, importOptions={language:'mixed',pdfMode:'auto'};
 function toast(message,error=false){const t=$('#toast');t.textContent=message;t.className=`toast show${error?' error':''}`;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast',4500);}
 async function commit(change){
   if(!stateReady){toast('词库尚未读取成功，请先重新连接。',true);return false;}
@@ -65,10 +66,35 @@ function render(){
 }
 function bindDrop(el,callback){el.ondragover=e=>{e.preventDefault();el.classList.add('dragover');};el.ondragleave=()=>el.classList.remove('dragover');el.ondrop=e=>{e.preventDefault();el.classList.remove('dragover');callback([...e.dataTransfer.files]);};}
 function importBody(tab){return `<div class="tabs"><button class="tab ${tab==='files'?'active':''}" data-action="import-tab-files">上传文件</button><button class="tab ${tab==='text'?'active':''}" data-action="import-tab-text">粘贴文本</button></div>${tab==='files'?`<button class="dropzone" id="import-drop" data-action="pick-files" style="margin-top:0;min-height:210px"><span class="upload-art">${icon('upload')}</span><strong>将材料拖到这里，或 <span>选择文件</span></strong><small>图片、PDF、DOCX、TXT、MD、CSV、TSV · 每个文件最大 30 MB</small></button><input id="file-picker" type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,.pdf,.docx,.txt,.md,.csv,.tsv" multiple hidden><p class="subtitle">一次可选多个文件，它们会合并为同一个新词库。图片建议使用清晰的印刷体。</p>`:`<label class="field"><span>粘贴英文段落或单词列表</span><textarea id="paste-text" rows="9" placeholder="例如：\ncuriosity\nresilience\nperspective\n\n也可以粘贴整段英文文章，自动提取不重复的单词。"></textarea></label>`}<label class="check-row"><input type="checkbox" id="skip-common">过滤 a、the、and 等基础功能词</label><div id="import-error" class="note warning" hidden></div>`;}
-function showImport(tab='files',files=null){importTab=tab;draft=[];draftSources=[];openModal('建立新词库','01 导入材料　→　02 校对单词　→　03 保存词库',importBody(tab),`<span class="privacy-caption">${icon('shield')} 本地识别 · 自动去重</span><button class="btn primary" data-action="parse-text" ${tab==='files'?'hidden':''}>提取单词 ${icon('arrow')}</button>`);if(tab==='files'){$('#file-picker').onchange=e=>processFiles([...e.target.files]);bindDrop($('#import-drop'),processFiles);}if(files?.length)processFiles(files);}
+function showImport(tab='files',files=null){importTab=tab;draft=[];draftSources=[];draftNotes=[];draftOCR=false;openModal('建立新词库','01 导入材料　→　02 校对单词　→　03 保存词库',importBody(tab),`<span class="privacy-caption">${icon('shield')} 本地识别 · 自动去重</span><button class="btn primary" data-action="parse-text" ${tab==='files'?'hidden':''}>提取单词 ${icon('arrow')}</button>`);if(tab==='files'){$('#file-picker').onchange=e=>processFiles([...e.target.files]);bindDrop($('#import-drop'),processFiles);$('#skip-common').closest('label').insertAdjacentHTML('beforebegin',importOptionsFields());}if(files?.length)processFiles(files);}
+function importOptionsFields(){return `<div class="field-grid import-options"><label class="field"><span>图片中的语言</span><select id="ocr-language"><option value="mixed" ${importOptions.language==='mixed'?'selected':''}>中英混排</option><option value="english" ${importOptions.language==='english'?'selected':''}>纯英文（更快）</option></select></label><label class="field"><span>PDF 读取方式</span><select id="pdf-mode"><option value="auto" ${importOptions.pdfMode==='auto'?'selected':''}>自动 · 优先读取文字</option><option value="scan" ${importOptions.pdfMode==='scan'?'selected':''}>强制识图 · 文字乱码时用</option></select></label></div><p class="subtitle">高精度识图在本机运行；首次需下载模型。图片请裁掉无关内容并摆正，模糊字和手写体仍需核对。</p>`;}
 function importError(message){busyImport=false;showImport(importTab);$('#import-error').hidden=false;$('#import-error').textContent=message;}
 function progressView(){busyImport=true;$('.modal-body').innerHTML='<div class="import-progress"><p id="progress-text">正在准备识别…</p><div class="progress-bar"><div id="progress-fill" style="width:3%"></div></div><p class="subtitle" style="margin-top:18px">材料只在本机处理，较大的图片或 PDF 可能需要一点时间。</p></div>';$('.modal-foot').innerHTML='<span class="privacy-caption"><span class="spinner"></span> 请保持窗口打开</span>';}
-async function processFiles(files){if(!files.length||busyImport)return;const skip=$('#skip-common')?.checked;draftSources=files.map(f=>f.name);progressView();try{const text=await readFiles(files,(message,percent)=>{$('#progress-text').textContent=message;$('#progress-fill').style.width=`${percent}%`;});draft=await parseText(text,skip);busyImport=false;showDraft();}catch(e){importError(e.message);}}
+async function processFiles(files){
+  if(!files.length||busyImport)return;
+  const skip=$('#skip-common')?.checked;
+  importOptions={language:$('#ocr-language')?.value||'mixed',pdfMode:$('#pdf-mode')?.value||'auto'};
+  draftSources=files.map(f=>f.name);progressView();
+  try{
+    const result=await readFiles(files,(message,percent)=>{$('#progress-text').textContent=message;$('#progress-fill').style.width=`${percent}%`;},importOptions);
+    draftNotes=result.notes;draftOCR=result.ocrUsed;
+    draft=await parseText(result.text,skip,result.uncertain);busyImport=false;showDraft();markUncertainDraft();
+  }catch(e){importError(e.message);}
+}
+function markUncertainDraft(){
+  const list=$('.preview-list');if(!list)return;
+  if(draftNotes.length)list.insertAdjacentHTML('beforebegin',`<p class="note warning">${draftNotes.map(esc).join('<br>')}</p>`);
+  if(!draftOCR)return;
+  const count=draft.filter(w=>w.uncertain||!w.meaning).length;
+  list.insertAdjacentHTML('beforebegin',`<p class="note">已使用高精度图片识别。${count?`${count} 个词需重点核对，原因已在词下标注。`:'请对照原件检查拼写，识别结果可能存在遗漏。'}</p>${count?'<label class="check-row"><input type="checkbox" id="show-uncertain">仅显示待核对的词</label>':''}`);
+  draft.forEach((word,i)=>{
+    if(!word.uncertain&&word.meaning)return;
+    const row=$(`[data-draft-word="${i}"]`).closest('.preview-row');
+    row.classList.add('needs-review');
+    row.insertAdjacentHTML('beforeend',`<small class="ocr-warning">${word.uncertain?'识别置信度较低，请核对拼写':'未匹配到释义，请核对拼写或手动补充'}</small>`);
+  });
+  if($('#show-uncertain'))$('#show-uncertain').onchange=e=>list.querySelectorAll('.preview-row').forEach(row=>{row.hidden=e.target.checked&&!row.classList.contains('needs-review');});
+}
 async function processText(){const text=$('#paste-text').value;if(!text.trim())return toast('先粘贴一些英文内容。');const skip=$('#skip-common').checked;draftSources=['粘贴文本'];progressView();try{draft=await parseText(text,skip);busyImport=false;showDraft();}catch(e){importError(e.message);}}
 function showDraft(){if(!draft.length){importError('没有识别到英文单词。请检查材料清晰度，或尝试粘贴文本。');return;}const missing=draft.filter(w=>!w.meaning).length;openModal('校对，然后收进词库',`已提取 ${draft.length} 个不重复单词${missing?` · ${missing} 个词暂未匹配释义，可手动补充`:''}`,`<label class="field"><span>给这一批单词起个名字</span><input id="library-name" maxlength="100" placeholder="默认：词库${state.nextLibrary}" value=""><small>留空即保存为「词库${state.nextLibrary}」，以后也可重命名。</small></label><div class="section-title"><label class="check-row" style="margin:0"><input type="checkbox" id="select-draft-all" checked>全选单词</label><span class="source-label">可编辑英文拼写和中文释义</span></div><div class="preview-list">${draft.map((w,i)=>`<div class="preview-row"><input type="checkbox" data-draft-select="${i}" checked aria-label="保留 ${esc(w.word)}"><input class="word-input" data-draft-word="${i}" aria-label="英文单词 ${i+1}" value="${esc(w.word)}" maxlength="48"><input class="${w.meaning?'':'missing'}" data-draft-meaning="${i}" aria-label="中文释义 ${i+1}" value="${esc(w.meaning)}" placeholder="暂未收录，可手动填写" maxlength="1000"></div>`).join('')}</div><p class="subtitle">保存前请检查 OCR 拼写。空白释义可以稍后在词库内补充。</p>`,`<span id="draft-count" class="muted">已选择 ${draft.length} 个单词</span><div class="actions"><button class="btn" data-action="restart-import">重新导入</button><button class="btn primary" data-action="save-library">${icon('check')} 保存词库</button></div>`);$('#select-draft-all').onchange=e=>{document.querySelectorAll('[data-draft-select]').forEach(c=>c.checked=e.target.checked);updateDraftCount();};document.querySelectorAll('[data-draft-select]').forEach(c=>c.onchange=updateDraftCount);document.querySelectorAll('[data-draft-word]').forEach(c=>c.onchange=async()=>{const idx=Number(c.dataset.draftWord),word=normalize(c.value);c.value=word;if(/^[a-z]+(?:['-][a-z]+)*$/.test(word)){try{const value=await lookup(word);const field=$(`[data-draft-meaning="${idx}"]`);if(field){field.value=value.meaning;draft[idx].phonetic=value.phonetic;}}catch(e){toast(e.message,true);}}});}
 function updateDraftCount(){const count=document.querySelectorAll('[data-draft-select]:checked').length;$('#draft-count').textContent=`已选择 ${count} 个单词`;$('#select-draft-all').checked=count===draft.length;$('#select-draft-all').indeterminate=count>0&&count<draft.length;}

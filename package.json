@@ -1,6 +1,6 @@
 {
   "name": "wordspace-local",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "description": "词间：本地英语词库与听写工作台",

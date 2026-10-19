@@ -10,7 +10,7 @@ await writeFile(path.join(out,'.nojekyll'),'');
 const files=[
  'tesseract.js/dist/tesseract.min.js','tesseract.js/dist/worker.min.js','tesseract.js/LICENSE.md',
  'mammoth/mammoth.browser.min.js','mammoth/LICENSE',
- 'pdfjs-dist/build/pdf.mjs','pdfjs-dist/build/pdf.worker.mjs','pdfjs-dist/cmaps','pdfjs-dist/standard_fonts','pdfjs-dist/wasm','pdfjs-dist/LICENSE',
+ 'pdfjs-dist/legacy/build/pdf.mjs','pdfjs-dist/legacy/build/pdf.worker.mjs','pdfjs-dist/cmaps','pdfjs-dist/standard_fonts','pdfjs-dist/wasm','pdfjs-dist/LICENSE',
  'tesseract.js-core/LICENSE'
 ];
 const cores=await readdir(path.join(root,'node_modules/tesseract.js-core'));

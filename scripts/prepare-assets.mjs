@@ -17,7 +17,7 @@ async function download(url, dest) {
 }
 const csvSource = path.join(root, 'node_modules/ecdict/assets/ecdict.csv');
 await copyFile(path.join(root, 'node_modules/ecdict/LICENSE'), path.join(root, 'licenses/ecdict-package.txt'));
-await download('https://tessdata.projectnaptha.com/4.0.0/eng.traineddata.gz', path.join(assets, 'ocr/eng.traineddata.gz'));
+await import('./prepare-ocr.mjs');
 const buckets = Object.fromEntries('abcdefghijklmnopqrstuvwxyz'.split('').map(c => [c, {}]));
 let count = 0;
 for await (const row of createReadStream(csvSource).pipe(parse({ columns: true, bom: true, relax_quotes: true }))) {
